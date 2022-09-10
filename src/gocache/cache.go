@@ -1,21 +1,20 @@
 package gocache
 
-import "sync"
+import "time"
 
 type cache struct {
-	memData
-	lrulist
-	lrumap map[interface{}]*node
-	cap    int
-	mu     sync.Mutex
-	closed bool
+	*data
+	lrulist *lrulist
+	cap     int
 }
 
+type any = interface{}
+
+// New接收一个cap，不传入或者小于1则为无限制容量，返回一个cache
 func New(cap ...int) *cache {
 	c := &cache{
-		memData: *makeMemData(),
-		lrulist: *makeLrulist(),
-		lrumap:  make(map[interface{}]*node),
+		data:    makeData(),
+		lrulist: makeLrulist(),
 	}
 	if len(cap) > 0 {
 		c.cap = cap[0]
@@ -23,98 +22,91 @@ func New(cap ...int) *cache {
 	return c
 }
 
+// SetCap修改cap，为了安全，新cap不得小于c.Size(),小于1除外
 func (c *cache) SetCap(cap int) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.cap = cap
 	if cap < 1 {
+		c.cap = cap
 		return
 	}
-	for c.Size() > cap {
-		key := c.deletelast()
-		c.remove(key)
-		delete(c.lrumap, key)
-	}
-}
-
-func (c *cache) Set(key, val interface{}) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.set(key, val)
-	node := &node{
-		data: key,
-	}
-	c.insertHead(node)
-	c.lrumap[key] = node
-	if c.cap > 0 && c.Size() > c.cap {
-		key := c.deletelast()
-		c.remove(key)
-		delete(c.lrumap, key)
-	}
-}
-
-func (c *cache) SetIfNotExist(key, val interface{}) {
-	_, ok := c.get(key)
-	if ok {
+	if cap < c.Size() {
 		return
 	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.set(key, val)
-	node := &node{
-		data: key,
+}
+
+// Set接收任意类型的key和val，并将其写入cache
+func (c *cache) Set(key, val any) {
+	Entry := entry{
+		key: key,
+		val: val,
 	}
-	c.insertHead(node)
-	c.lrumap[key] = node
+	c.lrulist.mu.Lock()
+	defer c.lrulist.mu.Unlock()
+	c.data.add(key, c.lrulist.PushFront(Entry))
 	if c.cap > 0 && c.Size() > c.cap {
-		key := c.deletelast()
-		c.remove(key)
-		delete(c.lrumap, key)
+		c.Del(c.lrulist.Back().Value.(entry).key)
 	}
 }
 
-func (c *cache) Get(key interface{}) (val interface{}, ok bool) {
-	val, ok = c.get(key)
+// SetWithTimeout接收任意类型的key和val以及超时时间，并将其写入cache，到期后删除
+func (c *cache) SetWithTimeout(key, val any, timeout time.Duration) {
+	Entry := entry{
+		key:     key,
+		val:     val,
+		timeout: timeout,
+	}
+	c.lrulist.mu.Lock()
+	defer c.lrulist.mu.Unlock()
+	c.data.add(key, c.lrulist.PushFront(Entry))
+}
+
+// SetIfNotExist接收任意类型的key和val，当key存在时返回false；当key不存在时将其写入cache，并返回true
+func (c *cache) SetIfNotExist(key, val any) (ok bool) {
+	if _, ok := c.data.get(key); ok {
+		return false
+	}
+	c.Set(key, val)
+	return true
+}
+
+// Get接收任意类型的key，如果key存在则返回val和true，否则返回nil和false
+func (c *cache) Get(key any) (val interface{}, ok bool) {
+	e, ok := c.data.get(key)
 	if !ok {
-		return val, ok
+		return nil, ok
 	}
-	c.mu.Lock()
-	node := c.lrumap[key]
-	c.mu.Unlock()
-	c.delete(node)
-	c.insertHead(node)
-	return
+	entry := e.Value.(entry)
+	c.lrulist.mu.Lock()
+	defer c.lrulist.mu.Unlock()
+	c.lrulist.MoveToFront(e)
+	return entry.val, ok
 }
 
-func (c *cache) GetorSet(key, val interface{}) (v interface{}, ok bool) {
-	v, ok = c.get(key)
-	if !ok {
-		c.Set(key, val)
-		return val, ok
+// GetOrSet接收任意类型的key和val，如果key存在则返回val，不存在则写入cache，并返回val
+func (c *cache) GetOrSet(key, val any) (Val interface{}) {
+	if Val, ok := c.Get(key); ok {
+		return Val
 	}
-	c.mu.Lock()
-	node := c.lrumap[key]
-	c.mu.Unlock()
-	c.delete(node)
-	c.insertHead(node)
-	return
+	c.Set(key, val)
+	return Val
 }
 
-func (c *cache) Del(key ...interface{}) {
-	keys := c.remove(key...)
-	c.mu.Lock()
-	for _, v := range keys {
-		c.delete(c.lrumap[v])
-		delete(c.lrumap, v)
+// Del接收一个或多个key，并将其删除
+func (c *cache) Del(key ...any) {
+	es := c.data.remove(key...)
+	c.lrulist.mu.Lock()
+	defer c.lrulist.mu.Unlock()
+	for _, e := range es {
+		c.lrulist.Remove(e)
 	}
-	c.mu.Unlock()
 }
 
+// Cap返回cache的容量
+func (c *cache) Cap() int {
+	return c.cap
+}
+
+// Clear用以清空cache，谨慎使用
 func (c *cache) Clear() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.clear()
-	c.memData = *makeMemData()
-	c.lrulist = *makeLrulist()
-	c.lrumap = make(map[interface{}]*node)
+	c.data = makeData()
+	c.lrulist = makeLrulist()
 }

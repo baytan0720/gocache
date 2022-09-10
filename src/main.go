@@ -5,6 +5,5 @@ import (
 )
 
 func main() {
-	c := gocache.New()
-	c.Show()
+	gocache.New()
 }

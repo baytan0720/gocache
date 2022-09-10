@@ -1,133 +1,91 @@
 package gocache
 
 import (
+	"container/list"
 	"sync"
 	"time"
 )
 
-// type memKey struct {
-// 	key     interface{}
-// 	timeout time.Duration
-// }
-
-type memVal struct {
+type entry struct {
+	key     interface{}
 	val     interface{}
 	timeout time.Duration
 }
 
-type memData struct {
+type data struct {
 	mu   sync.RWMutex
-	data map[interface{}]memVal
+	data map[interface{}]*list.Element
 }
 
-func makeMemData() *memData {
-	return &memData{
-		data: make(map[interface{}]memVal),
+func makeData() *data {
+	return &data{
+		data: make(map[interface{}]*list.Element),
 	}
 }
 
-func (d *memData) Update(key, val interface{}) (oldVal interface{}, exist bool) {
+func (d *data) add(key interface{}, entry *list.Element) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	if v, ok := d.data[key]; ok {
-		d.data[key] = memVal{
-			val: val,
-		}
-		return v.val, true
-	}
-	return nil, false
+	d.data[key] = entry
 }
 
-func (d *memData) UpdateTimeout(key interface{}, timeout time.Duration) (oldtimeout time.Duration) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	if v, ok := d.data[key]; ok {
-		d.data[key] = memVal{
-			timeout: timeout,
-		}
-		return v.timeout
-	}
-	return -1
-}
-
-func (d *memData) remove(key ...interface{}) (removedKeys []interface{}) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	removedKeys = make([]interface{}, 0, len(key))
-	for _, k := range key {
-		if _, ok := d.data[k]; ok {
-			removedKeys = append(removedKeys, k)
-			delete(d.data, k)
-		}
-	}
-	return removedKeys
-}
-
-func (d *memData) Datas() map[interface{}]interface{} {
+func (d *data) get(key interface{}) (e *list.Element, ok bool) {
 	d.mu.RLock()
-	m := make(map[interface{}]interface{}, len(d.data))
-	for k, v := range d.data {
-		m[k] = v.val
-	}
-	d.mu.RUnlock()
-	return m
-}
-
-func (d *memData) Keys() []interface{} {
-	d.mu.RLock()
-	var (
-		index = 0
-		keys  = make([]interface{}, len(d.data))
-	)
-	for k := range d.data {
-		keys[index] = k
-		index++
-	}
-	d.mu.RUnlock()
-	return keys
-}
-
-func (d *memData) Values() []interface{} {
-	d.mu.RLock()
-	var (
-		index  = 0
-		values = make([]interface{}, len(d.data))
-	)
-	for _, v := range d.data {
-		values[index] = v.val
-		index++
-	}
-	d.mu.RUnlock()
-	return values
-}
-
-func (d *memData) Size() (size int) {
-	d.mu.RLock()
-	size = len(d.data)
-	d.mu.RUnlock()
-	return size
-}
-
-func (d *memData) clear() {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	d.data = make(map[interface{}]memVal)
-}
-
-func (d *memData) get(key interface{}) (val interface{}, ok bool) {
-	d.mu.RLock()
-	v, ok := d.data[key]
-	d.mu.RUnlock()
+	defer d.mu.RUnlock()
+	e, ok = d.data[key]
 	if !ok {
 		return nil, ok
 	}
-	return v.val, ok
+	return
 }
 
-func (d *memData) set(key interface{}, val interface{}) {
+func (d *data) remove(key ...interface{}) (es []*list.Element) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	d.data[key] = memVal{
-		val: val,
+	es = make([]*list.Element, 0, len(key))
+	for _, key := range key {
+		if e, ok := d.data[key]; ok {
+			es = append(es, e)
+			delete(d.data, key)
+		}
 	}
+	return
+}
+
+// Size返回cache中已缓存的数量
+func (d *data) Size() int {
+	return len(d.data)
+}
+
+// Entrys以键值对的形式返回cache中所有缓存对象
+func (d *data) Entrys() (entrys []entry) {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	entrys = make([]entry, 0, d.Size())
+	for _, v := range d.data {
+		entrys = append(entrys, v.Value.(entry))
+	}
+	return
+}
+
+// Keys返回cache中所有key
+func (d *data) Keys() (keys []interface{}) {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	keys = make([]interface{}, 0, d.Size())
+	for k := range d.data {
+		keys = append(keys, k)
+	}
+	return
+}
+
+// Vals返回cache中所有val
+func (d *data) Vals() (vals []interface{}) {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	vals = make([]interface{}, 0, d.Size())
+	for _, v := range d.data {
+		vals = append(vals, v.Value.(entry).val)
+	}
+	return
 }
