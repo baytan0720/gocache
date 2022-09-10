@@ -43,7 +43,6 @@ func makeEventList() *eventlist {
 
 func (l *eventlist) orderInsert(e event) {
 	l.mu.Lock()
-	defer l.mu.Unlock()
 	prev := l.head
 	now := l.head.next
 	for now != nil {
@@ -57,6 +56,7 @@ func (l *eventlist) orderInsert(e event) {
 		e:    e,
 		next: now,
 	}
+	l.mu.Unlock()
 	if l.len == 0 {
 		l.run <- nil
 	}
@@ -74,8 +74,10 @@ func (l *eventlist) cleanExpire() {
 		front := l.head.next
 		timeout := time.Duration(front.e.timeout - time.Now().UnixNano())
 		if timeout > 0 {
+			l.mu.Unlock()
 			timer.Reset(timeout)
 			<-timer.C
+			l.mu.Lock()
 		}
 		l.expireKey <- front.e.key
 		l.head.next = front.next
