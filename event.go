@@ -14,7 +14,7 @@ type (
 	eventlist struct {
 		*ilist
 		expireKey chan interface{}
-		run       chan interface{}
+		run       chan int64
 		mu        sync.RWMutex
 		len       int
 	}
@@ -35,13 +35,13 @@ func makeEventList() *eventlist {
 			head: &node{},
 		},
 		expireKey: make(chan interface{}),
-		run:       make(chan interface{}),
+		run:       make(chan int64),
 	}
 	go l.cleanExpire()
 	return l
 }
 
-func (l *eventlist) orderInsert(e event) {
+func (l *eventlist) orderInsert(e event, start int64) {
 	l.mu.Lock()
 	prev := l.head
 	now := l.head.next
@@ -58,7 +58,7 @@ func (l *eventlist) orderInsert(e event) {
 	}
 	l.mu.Unlock()
 	if l.len == 0 {
-		l.run <- nil
+		l.run <- time.Now().UnixNano() - start
 	}
 	l.len++
 }
@@ -67,12 +67,13 @@ func (l *eventlist) cleanExpire() {
 	timer := time.NewTimer(0)
 	timer.Stop()
 	for {
+		var timeconsum int64
 		if l.len == 0 {
-			<-l.run
+			timeconsum = <-l.run
 		}
 		l.mu.Lock()
 		front := l.head.next
-		timeout := time.Duration(front.e.timeout - time.Now().UnixNano())
+		timeout := time.Duration(front.e.timeout - time.Now().UnixNano() - timeconsum)
 		if timeout > 0 {
 			l.mu.Unlock()
 			timer.Reset(timeout)
