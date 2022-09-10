@@ -38,6 +38,8 @@ func (c *cache) SetCap(cap int) {
 	}
 	if cap < c.Size() {
 		return
+	} else {
+		c.cap = cap
 	}
 }
 
