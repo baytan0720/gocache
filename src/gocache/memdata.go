@@ -3,13 +3,12 @@ package gocache
 import (
 	"container/list"
 	"sync"
-	"time"
 )
 
 type entry struct {
 	key     interface{}
 	val     interface{}
-	timeout time.Duration
+	timeout int64
 }
 
 type data struct {
