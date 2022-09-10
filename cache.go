@@ -50,11 +50,11 @@ func (c *cache) Set(key, val any) {
 		val:     val,
 		timeout: -1,
 	}
-	c.lrulist.mu.Lock()
-	defer c.lrulist.mu.Unlock()
-	c.data.add(key, c.lrulist.PushFront(Entry))
+	c.data.add(key, c.lrulist.pushFront(Entry))
 	if c.cap > 0 && c.Size() > c.cap {
-		c.Del(c.lrulist.Back().Value.(entry).key)
+		key := c.lrulist.back().Value.(entry).key
+		c.Del(key)
+		return
 	}
 }
 
@@ -66,16 +66,16 @@ func (c *cache) SetWithTimeout(key, val any, timeout time.Duration) {
 		val:     val,
 		timeout: expire,
 	}
-	c.lrulist.mu.Lock()
-	defer c.lrulist.mu.Unlock()
-	c.data.add(key, c.lrulist.PushFront(Entry))
-	if c.cap > 0 && c.Size() > c.cap {
-		c.Del(c.lrulist.Back().Value.(entry).key)
-	}
+	c.data.add(key, c.lrulist.pushFront(Entry))
 	c.eventlist.orderInsert(event{
 		key:     key,
 		timeout: expire,
 	})
+	if c.cap > 0 && c.Size() > c.cap {
+		key := c.lrulist.back().Value.(entry).key
+		c.Del(key)
+		return
+	}
 }
 
 // SetIfNotExist接收任意类型的key和val，当key存在时返回false；当key不存在时将其写入cache，并返回true
@@ -94,9 +94,7 @@ func (c *cache) Get(key any) (val interface{}, ok bool) {
 		return nil, ok
 	}
 	entry := e.Value.(entry)
-	c.lrulist.mu.Lock()
-	defer c.lrulist.mu.Unlock()
-	c.lrulist.MoveToFront(e)
+	c.lrulist.moveToFront(e)
 	return entry.val, ok
 }
 
@@ -119,13 +117,17 @@ func (c *cache) GetOrSet(key, val any) (Val interface{}) {
 	return Val
 }
 
+// Contains接收任意类型的key，如果key存在则返回true，否则返回false
+func (c *cache) Contains(key any) bool {
+	_, ok := c.data.get(key)
+	return ok
+}
+
 // Del接收一个或多个key，并将其删除
 func (c *cache) Del(key ...any) {
 	es := c.data.remove(key...)
-	c.lrulist.mu.Lock()
-	defer c.lrulist.mu.Unlock()
 	for _, e := range es {
-		c.lrulist.Remove(e)
+		c.lrulist.remove(e)
 	}
 }
 
