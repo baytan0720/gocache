@@ -1,10 +1,10 @@
 # gocache
-[<font size=4>描述</font>](#描述)   
-[<font size=4>安装</font>](#安装)   
-[<font size=4>使用</font>](#使用)   
-&emsp;[<font size=3>基本使用</font>](#基本使用)   
-&emsp;[<font size=3>超时控制</font>](#超时控制)   
-[<font size=4>性能测试</font>](#性能测试)
+[<font size=5>描述</font>](#描述)   
+[<font size=5>安装</font>](#安装)   
+[<font size=5>使用</font>](#使用)   
+&emsp;[<font size=4>基本使用</font>](#基本使用)   
+&emsp;[<font size=4>超时控制</font>](#超时控制)   
+[<font size=5>性能测试</font>](#性能测试)
 
 ## 描述   
 golang实现的轻量级高性能缓存   
