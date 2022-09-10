@@ -60,8 +60,7 @@ func (c *cache) Set(key, val any) {
 
 // SetWithTimeout接收任意类型的key和val以及超时时间，并将其写入cache，到期后删除
 func (c *cache) SetWithTimeout(key, val any, timeout time.Duration) {
-	start := time.Now().UnixNano()
-	expire := start + timeout.Nanoseconds()
+	expire := time.Now().UnixNano() + timeout.Nanoseconds()
 	Entry := entry{
 		key:     key,
 		val:     val,
@@ -71,7 +70,7 @@ func (c *cache) SetWithTimeout(key, val any, timeout time.Duration) {
 	c.eventlist.orderInsert(event{
 		key:     key,
 		timeout: expire,
-	}, start)
+	})
 	if c.cap > 0 && c.Size() > c.cap {
 		key := c.lrulist.back().Value.(entry).key
 		c.Del(key)
