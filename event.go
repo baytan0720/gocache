@@ -58,7 +58,7 @@ func (l *eventlist) orderInsert(e event, start int64) {
 	}
 	l.mu.Unlock()
 	if l.len == 0 {
-		l.run <- time.Now().UnixNano() - start
+		l.run <- start
 	}
 	l.len++
 }
@@ -67,13 +67,18 @@ func (l *eventlist) cleanExpire() {
 	timer := time.NewTimer(0)
 	timer.Stop()
 	for {
-		var timeconsum int64
+		var start int64
+		var timeout time.Duration
 		if l.len == 0 {
-			timeconsum = <-l.run
+			start = <-l.run
 		}
 		l.mu.Lock()
 		front := l.head.next
-		timeout := time.Duration(front.e.timeout - time.Now().UnixNano() - timeconsum)
+		if start != 0 {
+			timeout = time.Duration(front.e.timeout - start - 2*time.Now().UnixNano())
+		} else {
+			timeout = time.Duration(front.e.timeout - time.Now().UnixNano())
+		}
 		if timeout > 0 {
 			l.mu.Unlock()
 			timer.Reset(timeout)
