@@ -57,12 +57,13 @@ func (d *data) Size() int {
 }
 
 // Entrys以键值对的形式返回cache中所有缓存对象
-func (d *data) Entrys() (entrys []entry) {
+func (d *data) Entrys() (entrys [][]interface{}) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
-	entrys = make([]entry, 0, d.Size())
+	entrys = make([][]interface{}, 0, d.Size())
 	for _, v := range d.data {
-		entrys = append(entrys, v.Value.(entry))
+		e := v.Value.(entry)
+		entrys = append(entrys, []interface{}{e.key, e.val})
 	}
 	return
 }
