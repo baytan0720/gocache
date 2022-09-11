@@ -80,7 +80,7 @@ func main() {
 	c := gocache.New()
 
 	// 写入缓存并设置超时
-	c.SetWithTimeout(1, 1, 1*time.Second)
+	c.SetWithTimeout(1, 1, time.Second)
 	c.GetOrSet(2, 2)
 
 	// 获取缓存以及剩余时间
