@@ -113,9 +113,9 @@ goos: darwin
 goarch: amd64
 pkg: gocache/test
 cpu: Intel(R) Core(TM) i7-4870HQ CPU @ 2.50GHz
-Benchmark_Set-8          1477167               743.2 ns/op           197 B/op          4 allocs/op
-Benchmark_Get-8          4820923               251.0 ns/op             0 B/op          0 allocs/op
-Benchmark_Del-8          2995764               413.7 ns/op             8 B/op          1 allocs/op
+Benchmark_Set-8          1489851               687.7 ns/op           197 B/op          4 allocs/op
+Benchmark_Get-8          4835456               249.8 ns/op             0 B/op          0 allocs/op
+Benchmark_Del-8          3083304               403.5 ns/op             8 B/op          1 allocs/op
 PASS
-ok      gocache/test    17.211s
+ok      gocache/test    16.659s
 ```
