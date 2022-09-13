@@ -4,6 +4,7 @@
 [<font size=5>使用</font>](#使用)   
 &emsp;[<font size=4>基本使用</font>](#基本使用)   
 &emsp;[<font size=4>超时控制</font>](#超时控制)   
+&emsp;[<font size=4>HTTP</font>](#http) 
 [<font size=5>性能测试</font>](#性能测试)
 
 ## 描述   
@@ -106,6 +107,18 @@ func main() {
 999.919ms
 [2 3]
 ```
+### HTTP
+gocache提供了http接口，将项目clone到本地后运行以下命令即可启动
+```bash
+$ go mod init gocache
+$ go mod tidy
+$ cd cmd && go run main.go 8080
+```
+启动后在浏览器访问，参数放在url后面
+```
+127.0.0.1:8080/set?key=1&val=2
+```
+
 ## 性能测试
 ```bash
 test% go test -bench=. -benchmem
